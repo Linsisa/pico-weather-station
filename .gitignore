@@ -1,0 +1,4 @@
+build
+!.vscode/*
+include/wifi_secrets.h
+lib/FreeRTOS-Kernel

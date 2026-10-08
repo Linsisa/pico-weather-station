@@ -1,0 +1,65 @@
+.program dht
+
+wait 0 pin 0
+wait 1 pin 0
+wait 0 pin 0
+
+.wrap_target
+read_bit:
+    wait 1 pin 0 [31]
+    jmp pin high_detected
+    jmp low_detected
+
+high_detected:
+    set y 1
+    in y 1
+    wait 0 pin 0
+    jmp read_bit
+
+low_detected:
+    set y 0
+    in y 1
+    wait 0 pin 0
+    jmp read_bit
+.wrap
+
+
+% c-sdk {
+    static inline void dht_program_init(PIO pio, uint sm, uint offset, uint in_pin, float frequency) {
+        uint in_pin_count = 1;
+
+        // 1. Define a config object
+        pio_sm_config config = dht_program_get_default_config(offset);
+
+        // 2. Set and initialize the input pins
+        sm_config_set_in_pins(&config, in_pin);
+        sm_config_set_jmp_pin(&config, in_pin);
+
+        pio_sm_set_consecutive_pindirs(
+            pio, sm, in_pin, in_pin_count, 0
+        );
+
+        pio_gpio_init(pio, in_pin);
+
+        // 4. Set clock divider
+        if (frequency < 2000) {
+            frequency = 2000;
+        }
+        float clock_divider = (float) clock_get_hz(clk_sys) / frequency;
+        sm_config_set_clkdiv(&config, clock_divider);
+
+        // 5. Configure input shift register
+        // args: BOOL right_shift, BOOL auto_push, 1..32 push_threshold
+        sm_config_set_in_shift(&config, false, true, 8);
+
+        // 7. Join the ISR
+        // PIO_FIFO_JOIN_NONE = 0, PIO_FIFO_JOIN_TX = 1, PIO_FIFO_JOIN_RX = 2
+        sm_config_set_fifo_join(&config, PIO_FIFO_JOIN_RX);
+
+        // 8. Apply the configuration
+        pio_sm_init(pio, sm, offset, &config);
+
+        // 9. Activate the State Machine
+        pio_sm_set_enabled(pio, sm, true);
+    }
+%}
