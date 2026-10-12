@@ -248,6 +248,6 @@ void task_display(void *pvParameters) {
         bool new_data = (xQueueReceive(display_sensor_data_queue, &sensor_data, 0) == pdPASS);
         
         bool should_refresh = new_data || (notification_value & BUTTON_NOTIFY_BIT);
-        if (should_refresh) {  refresh_display(sensor_data, buffer, buffer_size); }
+        if (should_refresh) { refresh_display(sensor_data, buffer, buffer_size); }
     }
 }
