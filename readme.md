@@ -10,22 +10,13 @@ A weather station based on the Raspberry Pi Pico W, FreeRTOS, a DHT11 temperatur
 
 ## About
 
-This project collects environmental measurements with a Raspberry Pi Pico W and makes them available in two ways:
+This project collects environmental measurements with a Raspberry Pi Pico W, displays them locally on a 16x2 LCD, and publishes them remotely via MQTT over Wi-Fi.
 
-- locally on a 16x2 LCD display;
-- remotely through an MQTT broker over Wi-Fi.
+### Features
 
-The firmware is written in C and uses the Raspberry Pi Pico SDK, FreeRTOS, lwIP MQTT, ADC, I2C, and PIO.
-
-## Features
-
-- Temperature and humidity measurements with a DHT11.
-- Ambient light measurement with an LDR connected to the ADC.
-- Local display on an LCD1602 through a PCF8574 I2C backpack.
-- Display mode switching with a push button.
-- Wi-Fi station mode on the Pico W.
-- MQTT publication of the latest sensor values.
-- FreeRTOS tasks and queues separating acquisition, display, and communication.
+- FreeRTOS tasks and queues isolate sensor acquisition, display, and Wi-Fi communication.
+- 16x2 LCD display (with mode switching via button) + JSON payload published via MQTT.
+- Custom PIO state machine for DHT11 timings, ADC for LDR light measurements, and I2C for the screen.
 
 ## Hardware and Wiring
 
@@ -51,22 +42,20 @@ The firmware is written in C and uses the Raspberry Pi Pico SDK, FreeRTOS, lwIP 
 
 ### Wiring Diagram
 
-To reproduce this project, wire the components according to the diagrams below. Please note that the **DHT11** data line requires a pull-up resistor (typically 4.7 kΩ to 10 kΩ), which is already built into the module used here. Similarly, the **I2C LCD** relies on integrated pull-up resistors on its PCF8574 backpack for the SDA and SCL lines. Finally, the **push button** is configured with a pull-down resistor, and the **LDR** is wired into a voltage divider with a fixed resistor to allow analog readings.
+To reproduce this project, wire the components according to the diagrams below. Note that the DHT11 and PCF8574 LCD backpack already include their respective pull-up resistors.
 
 <summary><b> Schematic diagram </b></summary>
-<img src="docs/images/pico-weather-station_schem.png" alt="Schematic diagram" width="45%"/>
+<img src="docs/images/pico-weather-station_schem.png" alt="Schematic diagram" width="50%"/>
 
 <summary><b> Breadboard wiring diagram </b></summary>
 <img src="docs/images/pico-weather-station_bb.png" alt="Wiring diagram" width="50%"/>
 
 
-## Architecture
-
-The firmware starts three FreeRTOS tasks. The sensor task overwrites the latest value in two one-item queues. The display task is notified when new data arrives, while the communication task periodically publishes the latest value.
+## Firmware Structure
 
 ```mermaid
 flowchart LR
-		DHT[DHT11<br/>PIO] --> S[Sensor task<br/>every 4 s]
+		DHT[DHT11<br/>PIO] --> S[Sensors task<br/>every 4 s]
 		LDR[LDR<br/>ADC0] --> S
 		S -->|latest sensor_data_t| QD[Display queue]
 		S -->|latest sensor_data_t| QC[Communication queue]
@@ -80,67 +69,28 @@ flowchart LR
 
 | Task | Responsibility | Period / priority |
 | --- | --- | --- |
-| `task_sensors` | Reads the DHT11 and LDR, then updates both queues | 4 s / priority 2 |
-| `task_display` | Updates the LCD after sensor or button notifications | Event-driven / priority 3 |
-| `task_comm` | Connects to Wi-Fi and MQTT, then publishes sensor data | 10 s / priority 1 |
+| `task_sensors` | Reads the sensors and overwrites the latest values into two single-item queues. | 4 s / priority 2 |
+| `task_display` | Waits for a notification and wakes up immediately when new data arrives to refresh the screen. | Event-driven / priority 3 |
+| `task_comm` | Periodically reads the latest queue values and publishes them. | 10 s / priority 1 |
 
-## MQTT Message Format
+### MQTT Message Format
+Topic: `home/pico-weather-station/data`  
+Payload (JSON): `{"temp": 23.4, "hum": 56, "lum": 72}`
 
-The firmware publishes to:
-
-```text
-home/pico-weather-station/data
-```
-
-The payload is JSON:
-
-```json
-{
-	"temp": 23.4,
-	"hum": 56,
-	"lum": 72
-}
-```
 
 | Field | Type | Description | Unit |
 | --- | --- | --- | --- |
-| `temp` | number | Temperature from the DHT11 | °C |
+| `temp` | float | Temperature from the DHT11 | °C |
 | `hum` | integer | Relative humidity from the DHT11 | % |
 | `lum` | integer | LDR reading scaled from ADC to a percentage | % |
 
-MQTT currently uses port `1883`, client ID `pico`, keep-alive `60` seconds, QoS `0`, and retain `false`.
-
-## Tech Stack
-
-- C11
-- ARM GCC toolchain `15.2.1`
-- Raspberry Pi Pico SDK `2.3.1`
-- Raspberry Pi Pico W (`pico_w`)
-- FreeRTOS Kernel
-- lwIP MQTT client
-- CMake and Ninja
-- PIO for the DHT11 timing-sensitive protocol
-- ADC for the LDR
-- I2C for the LCD1602
-
 ## Installation & Setup
 
-### Prerequisites
+### 1. Prerequisites & Configuration
+Ensure you have the **ARM GCC toolchain**, **CMake**, and the **Pico SDK** installed (e.g., via the VS Code Extension).
 
-Install the following tools:
 
-- CMake
-- Ninja
-- ARM GCC toolchain compatible with the Pico SDK
-- Raspberry Pi Pico SDK
-- `picotool`
-- A USB cable capable of data transfer
-
-The project expects the Pico SDK and tools installed through the Raspberry Pi Pico VS Code extension, or available through the usual SDK environment variables.
-
-### Configure Wi-Fi and MQTT
-
-Create or update `include/wifi_secrets.h` locally. This file is intentionally not documented with real credentials:
+Create `include/wifi_secrets.h` locally with your credentials and MQTT broker information:
 
 ```c
 #define WIFI_SSID "your-wifi-name"
@@ -150,18 +100,14 @@ Create or update `include/wifi_secrets.h` locally. This file is intentionally no
 #define MQTT_PASS "your-mqtt-password"
 ```
 
-## Installation & Setup: Build
-
-From the project root:
-
+### 2. Build & Flash
+Run the following commands from the project root (or use the VS Code *Compile Project* task):
 ```bash
-cmake -S . -B build -G Ninja
+mkdir build
+cmake -S . -B build -G Ninja -DPICO_BOARD=pico_w
 ninja -C build
 ```
-
-The build generates firmware files such as `build/main.uf2` and `build/main.elf`.
-
-In VS Code, the same operation is available through the **Compile Project** task.
+Put your Pico W into **BOOTSEL** mode and flash the generated `build/main.uf2` file.
 
 ## How to Use
 
@@ -169,49 +115,15 @@ In VS Code, the same operation is available through the **Compile Project** task
 2. Add the local Wi-Fi and MQTT configuration.
 3. Build the project.
 4. Put the Pico W into BOOTSEL mode and copy `build/main.uf2` to the mounted board, or use `picotool`.
-5. Power-cycle the board and wait for the Wi-Fi and MQTT connection.
+5. Power-cycle the board and wait for the Wi-Fi and MQTT connection (3 times on-board led flashes if successful config, else 1 flash if failed).
 6. Check the LCD for local readings and subscribe to the MQTT topic.
-```
-
-## Project Structure
-
-```text
-.
-├── CMakeLists.txt
-├── docs/
-│   └── images/
-│   	├── pico-weather-station_bb.png
-		├── pico-weather-station_schem.png
-		└── weather-station.jpg
-├── include/
-│   ├── config.h
-│   ├── display_modes.h
-│   ├── FreeRTOSConfig.h
-│   ├── lwipopts.h
-│   ├── sensor_data.h
-│   └── wifi_secrets.h              # Local credentials; do not commit
-├── lib/
-│   └── FreeRTOS-Kernel/
-└── src/
-		├── main.c
-		├── drivers/
-		│   ├── dht11_pio.c/.h
-		│   ├── dht11.pio
-		│   ├── lcd1602_i2c.c/.h
-		│   └── ldr_adc.c/.h
-		└── tasks/
-            ├── task_sensors.c/.h
-            ├── task_display.c/.h
-            └── task_comm.c/.h
-```
 
 ## Known Limitations
 
-- Wi-Fi and MQTT are initialized once at startup; the communication task does not currently reconnect after a connection failure.
-- The MQTT broker address is configured as an IPv4 address, not resolved from a hostname.
-- MQTT uses QoS 0, so messages are not acknowledged or persisted by the protocol.
-- The LDR percentage is a simple linear conversion from the 12-bit ADC value; it is not calibrated to physical illuminance in lux.
-- The DHT11 has relatively low accuracy and a limited sampling rate compared with more modern sensors.
-- Sensor data is only forwarded after a valid DHT11 checksum; invalid readings are discarded.
-- Each queue stores only the latest measurement, so older measurements are intentionally overwritten.
-- The exact wiring, resistor values, enclosure, power supply, and calibration are hardware-dependent.
+- **No Reconnection:** Wi-Fi and MQTT connect once at boot; the firmware does not auto-reconnect on failure.
+- **Hardcoded Broker:** The MQTT broker must be configured as an IPv4 address (no hostname resolution).
+- **QoS 1 Only:** Messages are published with QoS 1; no retries implemented for failed publishes.
+- **Uncalibrated LDR:** Light percentage is a simple linear ADC conversion, not actual physical lux.
+- **DHT11 Limitations:** The DHT11 sensor has low accuracy and a limited sampling rate compared to modern sensors.
+- **No data logging:** The firmware does not store historical measurements; it only displays and publishes the latest readings.
+- **Reduced screen brightness:** The LCD is powered directly from the Pico W's 3.3V pin, which may result in lower brightness compared to a dedicated 5V supply.
