@@ -54,13 +54,13 @@
 #define SENSOR_NOTIFY_BIT 0x02
 
 // WIFI
-#define WIFI_CONNECT_TIMEOUT_MS 30000
+#define WIFI_CONNECT_TIMEOUT_MS 15000
 // MQTT
 #define MQTT_BROKER_PORT 1883
 #define MQTT_CLIENT_ID "pico"
 #define MQTT_TOPIC "home/pico-weather-station/data"
 #define MQTT_KEEP_ALIVE 60
-#define MQTT_QOS 0
+#define MQTT_QOS 1
 #define MQTT_RETAIN 0
 
 
