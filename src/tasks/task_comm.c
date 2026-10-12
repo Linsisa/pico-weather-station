@@ -2,6 +2,7 @@
 
 #include "stdio.h"
 #include "string.h"
+#include "task.h"
 
 #include "pico/cyw43_arch.h"
 #include "lwip/apps/mqtt.h"
@@ -11,9 +12,9 @@
 #include "sensor_data.h"
 #include "wifi_secrets.h"   // WIFI_SSID, WIFI_PASSWORD, MQTT_BROKER_IP, MQTT_USER, MQTT_PASS
 
-
 static mqtt_client_t *mqtt_client;
 static volatile bool mqtt_connected = false;
+static volatile err_t last_mqtt_publish_result = ERR_OK;
 
 /*! \brief MQTT connection callback function.
  *
@@ -38,8 +39,16 @@ static void mqtt_connection_callback(mqtt_client_t *client, void *arg, mqtt_conn
  * \param result The result of the publish request.
  */
 static void mqtt_publish_request_callback(void *arg, err_t result) {
-    if (result != ERR_OK) {
-        printf("MQTT publish failed: %d\n", result);
+    TaskHandle_t comm_task_handle = (TaskHandle_t)arg;
+    last_mqtt_publish_result = result;
+    if (comm_task_handle != NULL) {
+        xTaskNotifyGive(comm_task_handle);
+    }
+
+    if (result == ERR_OK) {
+        printf("Callback: MQTT publish successful\n");
+    } else {
+        printf("Callback: MQTT publish failed: %d\n", result);
     }
 }
 
@@ -104,23 +113,38 @@ static bool mqtt_setup(void) {
  * This function publishes the sensor data to the MQTT topic.
  *
  * \param data The sensor data to publish.
+ * \return true if the publish is successful, false otherwise.
  */
-static void publish_sensor_data(sensor_data_t *data) {
-    if (!mqtt_connected) return;
+static bool publish_sensor_data(sensor_data_t *data) {
+    if (!mqtt_connected) return false;
 
     char payload[128];
     int len = snprintf(payload, sizeof(payload),
         "{\"temp\":%.1f,\"hum\":%d,\"lum\":%d}",
         data->temperature, data->humidity, data->luminosity);
 
+    // Purge the notification of the previous publish request, if any.
+    ulTaskNotifyTake(pdTRUE, 0);
+
     cyw43_arch_lwip_begin();
     err_t err = mqtt_publish(mqtt_client, MQTT_TOPIC, payload, len,
-                              MQTT_QOS, MQTT_RETAIN, mqtt_publish_request_callback, NULL);
+                              MQTT_QOS, MQTT_RETAIN, mqtt_publish_request_callback, 
+                              (void *)xTaskGetCurrentTaskHandle());
     cyw43_arch_lwip_end();
 
+    // If the publish request was not accepted, return false immediately not waiting for the callback.
     if (err != ERR_OK) {
-        printf("mqtt_publish error: %d\n", err);
+        printf("MQTT publish failed: %d\n", err);
+        return false;
     }
+
+    // Wait for the publish request to complete receiving a notification from the callback, with a timeout.
+    if (ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(MQTT_ACK_TIMEOUT_MS)) != pdPASS) {
+        printf("MQTT timeout, no response received from the broker.\n");
+        return false;
+    }
+
+    return (last_mqtt_publish_result == ERR_OK);
 }
 
 
@@ -131,10 +155,31 @@ void task_comm(void *pvParameters) {
     printf("task_comm started. Wi-Fi: %s, MQTT: %s\n",
            wifi_ok ? "OK" : "FAIL", mqtt_ok ? "OK" : "FAIL");
 
+    // Make on-board LED blink 3 times if Wi-Fi and MQTT are OK.
+    uint32_t blink_count = (wifi_ok && mqtt_ok) ? 3 : 0;
+    for (int i = 0; i < blink_count; i++) {
+        cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, LED_ON);
+        vTaskDelay(pdMS_TO_TICKS(1500));
+        cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, LED_OFF);
+        vTaskDelay(pdMS_TO_TICKS(500));
+    }
+
     sensor_data_t sensor_data = {0};
+    bool first_publish = true;
+
     while (true) {
         if (mqtt_ok && xQueuePeek(comm_sensor_data_queue, &sensor_data, 0) == pdPASS) {
-            publish_sensor_data(&sensor_data);
+
+            if (publish_sensor_data(&sensor_data)) {
+                if (!first_publish) {              
+                    // Visual validation of successful MQTT publish by turning on the LED for 1.5 seconds.
+                    cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, LED_ON);
+                    vTaskDelay(pdMS_TO_TICKS(1500));
+                    cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, LED_OFF);
+                }
+                
+                first_publish = false;
+            }
         }
 
         vTaskDelay(pdMS_TO_TICKS(COMM_TASK_DELAY_MS));

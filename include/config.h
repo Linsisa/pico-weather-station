@@ -3,6 +3,10 @@
 
 #include "hardware/i2c.h"
 
+// ON-BOARD LED
+#define LED_ON 1
+#define LED_OFF 0
+
 // LDR ADC
 #define LDR_ADC_CHANNEL 0
 #define LDR_ADC_PIN 26
@@ -62,6 +66,7 @@
 #define MQTT_KEEP_ALIVE 60
 #define MQTT_QOS 1
 #define MQTT_RETAIN 0
+#define MQTT_ACK_TIMEOUT_MS 2000 // 2 seconds timeout for waiting for MQTT broker publish ACK response
 
 
 #endif // CONFIG_H
