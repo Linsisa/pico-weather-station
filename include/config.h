@@ -22,6 +22,7 @@
 #define RIGHT_ROUND_BRACKET_CHAR 0x5D
 #define PLAIN_BLOCK_CHAR 0xFF
 #define EMPTY_BLOCK_CHAR 0x20
+#define DISPLAY_WAIT_TIMEOUT_MS 6000
 
 // PCF8574 -> LCD
 #define RS        0x01   // P0
@@ -40,6 +41,7 @@
 #define DHT_NUM_BYTES 5
 #define DHT_TIMEOUT_US 10000 // 10 milliseconds timeout for reading DHT11 response
 #define DHT_INITIAL_WAIT_MS 1500 // Wait time to allow the DHT11 sensor to stabilize before starting readings (cf. datasheet recommendation).
+#define SENSOR_DATA_MAX_AGE_MS 12000 // Maximum age of sensor data in milliseconds (3 consecutive readings at 4 seconds each).
 
 // BUTTON
 #define BUTTON_PIN    14

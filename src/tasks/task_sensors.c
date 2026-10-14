@@ -73,10 +73,10 @@ void task_sensors(void *pvParameters) {
     while (true) {
         read_ldr(&sensor_data); // Read LDR value and convert it to percentage.
         dht11_readed = read_dht11(&sensor_data, program_offset); // Read data from DHT11 (temperature and humidity).
+        sensor_data.timestamp_ms = to_ms_since_boot(get_absolute_time()); // Update the timestamp in milliseconds since boot.
 
         if (dht11_readed) {
-            xQueueOverwrite(display_sensor_data_queue, &sensor_data);
-            xQueueOverwrite(comm_sensor_data_queue, &sensor_data);
+            xQueueOverwrite(sensor_data_queue, &sensor_data);
 
             if (display_task_handle != NULL) {
                 xTaskNotify(display_task_handle, SENSOR_NOTIFY_BIT, eSetBits);

@@ -13,18 +13,16 @@
 #include "../include/sensor_data.h"
 
 
-QueueHandle_t display_sensor_data_queue = NULL; // Queue to hold sensor data for the display task.
-QueueHandle_t comm_sensor_data_queue = NULL; // Queue to hold sensor data for the communication task.
+QueueHandle_t sensor_data_queue = NULL; // Queue for sensor data used by the display and communication tasks.
 TaskHandle_t display_task_handle = NULL; // Handle for the display task.
 
 
 int main() {
     stdio_init_all();
 
-    display_sensor_data_queue = xQueueCreate(1, sizeof(sensor_data_t));
-    comm_sensor_data_queue = xQueueCreate(1, sizeof(sensor_data_t));
+    sensor_data_queue = xQueueCreate(1, sizeof(sensor_data_t));
 
-    if (display_sensor_data_queue != NULL && comm_sensor_data_queue != NULL) {
+    if (sensor_data_queue != NULL) {
 
         BaseType_t sensors_task = xTaskCreate(task_sensors, "Sensors", SENSOR_TASK_STACK_SIZE, NULL, SENSOR_TASK_PRIORITY, NULL);
         BaseType_t display_task = xTaskCreate(task_display, "Display", DISPLAY_TASK_STACK_SIZE, NULL, DISPLAY_TASK_PRIORITY, &display_task_handle);

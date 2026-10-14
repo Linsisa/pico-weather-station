@@ -5,8 +5,7 @@
 #include "queue.h"
 #include "task.h"
 
-extern QueueHandle_t display_sensor_data_queue; // Queue to hold sensor data for the display task.
-extern QueueHandle_t comm_sensor_data_queue; // Queue to hold sensor data for the communication task.
+extern QueueHandle_t sensor_data_queue; // Queue for sensor data used by the display and communication tasks.
 extern TaskHandle_t display_task_handle; // Handle for the display task.
 
 void task_sensors(void *pvParameters);

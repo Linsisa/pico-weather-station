@@ -11,7 +11,7 @@
 #include "sensor_data.h"
 
 
-static volatile display_mode_t DISPLAY_MODE = DISPLAY_MODE_FULL_INFO; // Default display mode show full information.
+static volatile display_mode_t current_display_mode = DISPLAY_MODE_FULL_INFO; // Default display mode show full information.
 static volatile uint64_t last_display_change_button_press_time = 0; // Variable to track the last button press time.
 static volatile bool has_display_mode_changed = false; // Flag to indicate if the display mode has changed and the screen needs to be cleared before updating.
 
@@ -185,22 +185,41 @@ static void lcd_luminosity_mode(sensor_data_t sensor_data, char *buffer, uint8_t
     draw_luminosity_icon(sensor_data.luminosity);
 }
 
+/*! \brief Display a message indicating that the sensor data is outdated.
+ *
+ * This function displays a message on the LCD indicating that the sensor data is outdated.
+ */
+static void lcd_outdated_data_mode(void) {
+    lcd1602_set_cursor_pos(0, 0);
+    lcd1602_write_string("OUTDATED DATA");
+
+    lcd1602_set_cursor_pos(1, 0);
+    lcd1602_write_string("Check sensors");
+}
+
+
 /*! \brief Refresh the LCD display based on the current display mode and sensor data.
  *
  * This function checks if the display mode has changed and clears the screen if necessary.
  * It then calls the appropriate function to update the display based on the current display mode.
  *
  * \param sensor_data The sensor data structure containing temperature, humidity, and luminosity values.
+ * \param data_ok A boolean indicating whether the sensor data is fresh and valid.
  * \param buffer A character buffer used for formatting strings to be displayed on the LCD.
  * \param buffer_size The size of the character buffer.
  */
-static void refresh_display(sensor_data_t sensor_data, char *buffer, uint8_t buffer_size) {
-    if (has_display_mode_changed) {
-        lcd1602_clear();
-        has_display_mode_changed = false;
+static void refresh_display(sensor_data_t sensor_data, bool data_ok, char *buffer, uint8_t buffer_size) {
+    static display_mode_t last_display_mode = DISPLAY_MODE_FULL_INFO; // Track the last display mode to detect changes.
+
+    // If data is outdated, force the display mode to be OUTDATED. Otherwise, use the current display mode.
+    display_mode_t new_mode = data_ok ? current_display_mode : DISPLAY_MODE_OUTDATED;
+
+    if (new_mode != last_display_mode) {
+        last_display_mode = new_mode;
+        lcd1602_clear(); // Clear the screen if the display mode has changed.
     }
 
-    switch (DISPLAY_MODE) {
+    switch (new_mode) {
         case DISPLAY_MODE_FULL_INFO:
             lcd_full_info_mode(sensor_data, buffer, buffer_size);
             break;
@@ -212,6 +231,9 @@ static void refresh_display(sensor_data_t sensor_data, char *buffer, uint8_t buf
             break;
         case DISPLAY_MODE_LUMINOSITY:
             lcd_luminosity_mode(sensor_data, buffer, buffer_size);
+            break;
+        case DISPLAY_MODE_OUTDATED:
+            lcd_outdated_data_mode();
             break;
         default:
             lcd_full_info_mode(sensor_data, buffer, buffer_size);
@@ -229,25 +251,27 @@ void task_display(void *pvParameters) {
     static char buffer[16]; // Buffer to hold formatted strings for LCD display.
     uint8_t buffer_size = sizeof(buffer);
     uint32_t notification_value; // Variable used to store the RTOS task's notification value, when the task is notified.
+    bool data_retrieved_ok = false; // Flag to indicate if new sensor data has been retrieved from the queue and is fresh.
 
     display_mode_button_init(); 
     lcd_init(); 
 
-    // Main loop waiting for notifications from the sensor task or button press events to update the display accordingly.
-    while (true) {
-        // Wait indefinitely for a notification from either the sensor task or the button press event.
-        xTaskNotifyWait(pdFALSE, ULONG_MAX, &notification_value, portMAX_DELAY);
-        
+    while(true) {
+        // Wait for a notification from the sensor task or button press events to update the display accordingly.
+        BaseType_t notified = xTaskNotifyWait(0, ULONG_MAX, &notification_value,
+                                              pdMS_TO_TICKS(DISPLAY_WAIT_TIMEOUT_MS));
+
         // Check if the notification is from the button press event and update the display mode accordingly.
-        if (notification_value & BUTTON_NOTIFY_BIT) {
-            DISPLAY_MODE = (display_mode_t)((DISPLAY_MODE + 1) % DISPLAY_MODE_COUNT);
-            has_display_mode_changed = true;
+        if (notified == pdTRUE && (notification_value & BUTTON_NOTIFY_BIT)) {
+            current_display_mode = (display_mode_t)((current_display_mode + 1) % DISPLAY_MODE_COUNT);
         }
 
-        // Check if new sensor data is available in the queue.
-        bool new_data = (xQueueReceive(display_sensor_data_queue, &sensor_data, 0) == pdPASS);
-        
-        bool should_refresh = new_data || (notification_value & BUTTON_NOTIFY_BIT);
-        if (should_refresh) { refresh_display(sensor_data, buffer, buffer_size); }
+        /* Check the freshness of the latest sensor data after every wake-up,
+        * whether caused by a notification or by the timeout.
+        */
+        data_retrieved_ok = (xQueuePeek(sensor_data_queue, &sensor_data, 0) == pdPASS) && 
+                             sensor_data_is_fresh(&sensor_data);
+
+        refresh_display(sensor_data, data_retrieved_ok, buffer, buffer_size);        
     }
 }

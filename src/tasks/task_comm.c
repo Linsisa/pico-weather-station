@@ -14,6 +14,7 @@
 
 static mqtt_client_t *mqtt_client;
 static volatile bool mqtt_connected = false;
+static volatile bool mqtt_conection_status_received = false;
 static volatile err_t last_mqtt_publish_result = ERR_OK;
 
 /*! \brief MQTT connection callback function.
@@ -26,6 +27,7 @@ static volatile err_t last_mqtt_publish_result = ERR_OK;
  */
 static void mqtt_connection_callback(mqtt_client_t *client, void *arg, mqtt_connection_status_t status) {
     mqtt_connected = (status == MQTT_CONNECT_ACCEPTED);
+    mqtt_conection_status_received = true;
     if (!mqtt_connected) {
         printf("MQTT refuse, status=%d\n", status);
     }
@@ -50,30 +52,6 @@ static void mqtt_publish_request_callback(void *arg, err_t result) {
     } else {
         printf("Callback: MQTT publish failed: %d\n", result);
     }
-}
-
-/*! \brief Initialize Wi-Fi connection.
- *
- * This function initializes the Wi-Fi connection using the cyw43_arch driver 
- * and the provided SSID and password.
- *
- * \return true if the Wi-Fi connection is successful, false otherwise.
- */
-static bool wifi_init(void) {
-    if (cyw43_arch_init()) {
-        printf("Wi-Fi initialisation failed\n");
-        return false;
-    }
-    cyw43_arch_enable_sta_mode();
-
-    if (cyw43_arch_wifi_connect_timeout_ms(WIFI_SSID, WIFI_PASSWORD,
-                                            CYW43_AUTH_WPA2_AES_PSK, WIFI_CONNECT_TIMEOUT_MS)) {
-        printf("Wi-Fi connection failed\n");
-        return false;
-    }
-
-    printf("Wi-Fi connection success\n");
-    return true;
 }
 
 /*! \brief Set up the MQTT client.
@@ -147,41 +125,101 @@ static bool publish_sensor_data(sensor_data_t *data) {
     return (last_mqtt_publish_result == ERR_OK);
 }
 
+/*! \brief Publish the latest sensor data from the queue if it is fresh.
+ *
+ * This function retrieves the latest sensor data from the queue and publishes it via MQTT
+ * if the data is fresh (not outdated).
+ *
+ * \return true if the publish is successful, false otherwise.
+ */
+static bool publish_latest_data(void) {
+    sensor_data_t latest_data;
 
-void task_comm(void *pvParameters) {
-    bool wifi_ok = wifi_init();
-    bool mqtt_ok = wifi_ok && mqtt_setup();
+    if (xQueuePeek(sensor_data_queue, &latest_data, 0) != pdPASS) {
+        return false; // No data available in the queue.
+    }
 
-    printf("task_comm started. Wi-Fi: %s, MQTT: %s\n",
-           wifi_ok ? "OK" : "FAIL", mqtt_ok ? "OK" : "FAIL");
+    if (!sensor_data_is_fresh(&latest_data)) {
+        printf("Latest sensor data is outdated, not publishing.\n");
+        return false; // Data is outdated.
+    }
 
-    // Make on-board LED blink 3 times if Wi-Fi and MQTT are OK.
-    uint32_t blink_count = (wifi_ok && mqtt_ok) ? 3 : 0;
-    for (int i = 0; i < blink_count; i++) {
+    return publish_sensor_data(&latest_data);
+}
+
+/*! \brief Initialize Wi-Fi connection.
+ *
+ * This function initializes the Wi-Fi connection using the cyw43_arch driver 
+ * and the provided SSID and password.
+ *
+ * \return true if the Wi-Fi connection is successful, false otherwise.
+ */
+static bool wifi_init(void) {
+    if (cyw43_arch_init()) {
+        printf("Wi-Fi initialisation failed\n");
+        return false;
+    }
+    cyw43_arch_enable_sta_mode();
+
+    if (cyw43_arch_wifi_connect_timeout_ms(WIFI_SSID, WIFI_PASSWORD,
+                                            CYW43_AUTH_WPA2_AES_PSK, WIFI_CONNECT_TIMEOUT_MS)) {
+        printf("Wi-Fi connection failed\n");
+        return false;
+    }
+
+    printf("Wi-Fi connection success\n");
+    return true;
+}
+
+/*! \brief Blink the on-board LED to indicate connection status.
+ *
+ * This function blinks the on-board LED 3 times if Wi-Fi and MQTT connection is ok.
+ * If one fails, the LED blinks once to indicate a failure.
+ * 
+ *  \param connection_ok A boolean indicating that both Wi-Fi and MQTT are successfully connected.
+ */
+static void blink_connection_status(bool connection_ok) {
+    if (connection_ok) {
+        for (int i = 0; i < 3; i++) {
+            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, LED_ON);
+            vTaskDelay(pdMS_TO_TICKS(800));
+            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, LED_OFF);
+            vTaskDelay(pdMS_TO_TICKS(200));
+        }
+    } else {
         cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, LED_ON);
         vTaskDelay(pdMS_TO_TICKS(1500));
         cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, LED_OFF);
-        vTaskDelay(pdMS_TO_TICKS(500));
     }
+}
 
-    sensor_data_t sensor_data = {0};
-    bool first_publish = true;
+/*! \brief Blink the on-board LED to indicate a successful data publish.
+ *
+ * This function blinks the on-board LED once to indicate that sensor data has been successfully published.
+ */
+static void blink_data_published(void) {
+    cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, LED_ON);
+    vTaskDelay(pdMS_TO_TICKS(1500));
+    cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, LED_OFF);
+}
+
+
+void task_comm(void *pvParameters) {
+    bool wifi_ok = wifi_init();
+    
+    if (wifi_ok && mqtt_setup()) {
+        // Wait for the MQTT connection status callback to be called.
+        while (!mqtt_conection_status_received) {
+            vTaskDelay(pdMS_TO_TICKS(100));
+        }
+    }
+    blink_connection_status(wifi_ok && mqtt_connected);
 
     while (true) {
-        if (mqtt_ok && xQueuePeek(comm_sensor_data_queue, &sensor_data, 0) == pdPASS) {
-
-            if (publish_sensor_data(&sensor_data)) {
-                if (!first_publish) {              
-                    // Visual validation of successful MQTT publish by turning on the LED for 1.5 seconds.
-                    cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, LED_ON);
-                    vTaskDelay(pdMS_TO_TICKS(1500));
-                    cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, LED_OFF);
-                }
-                
-                first_publish = false;
-            }
-        }
-
         vTaskDelay(pdMS_TO_TICKS(COMM_TASK_DELAY_MS));
+
+        if (mqtt_connected && publish_latest_data()) {
+            blink_data_published();
+        }
     }
 }
