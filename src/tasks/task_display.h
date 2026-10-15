@@ -6,7 +6,6 @@
 #include "task.h"
 
 extern QueueHandle_t sensor_data_queue;
-extern TaskHandle_t display_task_handle; // Handle for the display task
 
 void task_display(void *pvParameters);
 

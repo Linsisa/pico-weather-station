@@ -45,6 +45,7 @@ add_executable(main
     src/drivers/ldr_adc.c
     src/drivers/lcd1602_i2c.c
     
+    src/tasks/display_button.c
     src/tasks/task_sensors.c
     src/tasks/task_display.c
     src/tasks/task_comm.c
