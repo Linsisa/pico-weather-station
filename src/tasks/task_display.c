@@ -18,9 +18,9 @@ static volatile display_mode_t current_display_mode = DISPLAY_MODE_FULL_INFO; //
  * This function is used as a placeholder for the outdated data display mode, which does not require sensor data or a buffer.
  * It simply calls the lcd_outdated_data_mode function to display the outdated data message.
  *
- * \param sensor_data The sensor data structure (not used in this function).
- * \param buffer A character buffer (not used in this function).
- * \param buffer_size The size of the character buffer (not used in this function).
+ * \param sensor_data_unused The sensor data structure (not used in this function).
+ * \param buffer_unused A character buffer (not used in this function).
+ * \param buffer_size_unused The size of the character buffer (not used in this function).
  */
 static void lcd_outdated_data_mode_adapter(sensor_data_t sensor_data_unused, char *buffer_unused, uint8_t buffer_size_unused) {
     (void)sensor_data_unused; (void)buffer_unused; (void)buffer_size_unused; // Suppress unused parameter warnings
