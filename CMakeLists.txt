@@ -40,14 +40,16 @@ pico_sdk_init()
 
 add_executable(main 
     src/main.c
+
+    src/drivers/dht11_pio.c
+    src/drivers/ldr_adc.c
+    src/drivers/lcd1602_i2c.c
     
     src/tasks/task_sensors.c
     src/tasks/task_display.c
     src/tasks/task_comm.c
 
-    src/drivers/dht11_pio.c
-    src/drivers/ldr_adc.c
-    src/drivers/lcd1602_i2c.c
+    src/ui/lcd_ui.c
 )
 
 pico_generate_pio_header(main
