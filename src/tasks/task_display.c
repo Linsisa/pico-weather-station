@@ -197,6 +197,28 @@ static void lcd_outdated_data_mode(void) {
     lcd1602_write_string("Check sensors");
 }
 
+/*! \brief Adapter for the lcd_outdated_data_mode function to match the signature of other display mode functions.
+ *
+ * This function is used as a placeholder for the outdated data display mode, which does not require sensor data or a buffer.
+ * It simply calls the lcd_outdated_data_mode function to display the outdated data message.
+ *
+ * \param sensor_data The sensor data structure (not used in this function).
+ * \param buffer A character buffer (not used in this function).
+ * \param buffer_size The size of the character buffer (not used in this function).
+ */
+static void lcd_outdated_data_mode_adapter(sensor_data_t sensor_data_unused, char *buffer_unused, uint8_t buffer_size_unused) {
+    (void)sensor_data_unused; (void)buffer_unused; (void)buffer_size_unused; // Suppress unused parameter warnings
+    lcd_outdated_data_mode();
+}
+
+typedef void (*display_mode_function_t)(sensor_data_t sensor_data, char *buffer, uint8_t buffer_size);
+static const display_mode_function_t display_handlers[] = {
+    [DISPLAY_MODE_FULL_INFO]   = lcd_full_info_mode,
+    [DISPLAY_MODE_TEMPERATURE] = lcd_temperature_mode,
+    [DISPLAY_MODE_HUMIDITY]    = lcd_humidity_mode,
+    [DISPLAY_MODE_LUMINOSITY]  = lcd_luminosity_mode,
+    [DISPLAY_MODE_OUTDATED]    = lcd_outdated_data_mode_adapter
+};
 
 /*! \brief Refresh the LCD display based on the current display mode and sensor data.
  *
@@ -214,31 +236,18 @@ static void refresh_display(sensor_data_t sensor_data, bool data_ok, char *buffe
     // If data is outdated, force the display mode to be OUTDATED. Otherwise, use the current display mode.
     display_mode_t new_mode = data_ok ? current_display_mode : DISPLAY_MODE_OUTDATED;
 
+    if (new_mode >= sizeof(display_handlers) / sizeof(display_handlers[0]) || !display_handlers[new_mode]) {
+        // Case where the new_mode is invalid or not handled, default to full info mode.
+        printf("Warning: Invalid display mode %d. Defaulting to DISPLAY_MODE_FULL_INFO.\n", new_mode);
+        new_mode = DISPLAY_MODE_FULL_INFO;
+    }
+
     if (new_mode != last_display_mode) {
         last_display_mode = new_mode;
         lcd1602_clear(); // Clear the screen if the display mode has changed.
     }
 
-    switch (new_mode) {
-        case DISPLAY_MODE_FULL_INFO:
-            lcd_full_info_mode(sensor_data, buffer, buffer_size);
-            break;
-        case DISPLAY_MODE_TEMPERATURE:
-            lcd_temperature_mode(sensor_data, buffer, buffer_size);
-            break;
-        case DISPLAY_MODE_HUMIDITY:
-            lcd_humidity_mode(sensor_data, buffer, buffer_size);
-            break;
-        case DISPLAY_MODE_LUMINOSITY:
-            lcd_luminosity_mode(sensor_data, buffer, buffer_size);
-            break;
-        case DISPLAY_MODE_OUTDATED:
-            lcd_outdated_data_mode();
-            break;
-        default:
-            lcd_full_info_mode(sensor_data, buffer, buffer_size);
-            break;
-    }
+    display_handlers[new_mode](sensor_data, buffer, buffer_size);
 }
 
 
@@ -261,16 +270,16 @@ void task_display(void *pvParameters) {
         BaseType_t notified = xTaskNotifyWait(0, ULONG_MAX, &notification_value,
                                               pdMS_TO_TICKS(DISPLAY_WAIT_TIMEOUT_MS));
 
-        // Check if the notification is from the button press event and update the display mode accordingly.
-        if (notified == pdTRUE && (notification_value & BUTTON_NOTIFY_BIT)) {
-            current_display_mode = (display_mode_t)((current_display_mode + 1) % DISPLAY_MODE_COUNT);
-        }
-
         /* Check the freshness of the latest sensor data after every wake-up,
         * whether caused by a notification or by the timeout.
         */
         data_retrieved_ok = (xQueuePeek(sensor_data_queue, &sensor_data, 0) == pdPASS) && 
                              sensor_data_is_fresh(&sensor_data);
+
+        // Check if the notification is from the button press event and update the display mode accordingly.
+        if (notified == pdTRUE && (notification_value & BUTTON_NOTIFY_BIT) && data_retrieved_ok) {
+            current_display_mode = (display_mode_t)((current_display_mode + 1) % DISPLAY_MODE_COUNT);
+        }
 
         refresh_display(sensor_data, data_retrieved_ok, buffer, buffer_size);        
     }
