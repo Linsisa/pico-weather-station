@@ -164,11 +164,11 @@ void lcd1602_clear(void) {
 
 /*!
  * \brief Set the cursor position on the LCD1602 display.
- *
- *  \param row The row number (0 or 1) where the cursor should be placed.
+ *  
  *  \param column The column number (0 to 15) where the cursor should be placed.
+ *  \param row The row number (0 or 1) where the cursor should be placed.
  */
-void lcd1602_set_cursor_pos(uint8_t row, uint8_t column) {
+void lcd1602_set_cursor_pos(uint8_t column, uint8_t row) {
     /*
      * The function calculates the appropriate DDRAM address based on the row and column values, 
      * and then sends the command to set the cursor position.

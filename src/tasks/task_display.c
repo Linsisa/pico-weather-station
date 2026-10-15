@@ -122,11 +122,11 @@ static void lcd_full_info_mode(sensor_data_t sensor_data, char *buffer, uint8_t 
 
     // Luminosity Writing.
     snprintf(buffer, buffer_size, "Lum:%3d%%", sensor_data.luminosity);
-    lcd1602_set_cursor_pos(1, 0);
+    lcd1602_set_cursor_pos(0, 1);
     lcd1602_write_string(buffer);
 
     // Luminosity Icon Drawing.
-    lcd1602_set_cursor_pos(1, 10);
+    lcd1602_set_cursor_pos(10, 1);
     draw_luminosity_icon(sensor_data.luminosity);
 }
 
@@ -143,7 +143,7 @@ static void lcd_temperature_mode(sensor_data_t sensor_data, char *buffer, uint8_
     lcd1602_set_cursor_pos(0, 0);
     lcd1602_write_string("Temperature:");
 
-    lcd1602_set_cursor_pos(1, 6);
+    lcd1602_set_cursor_pos(6, 1);
     snprintf(buffer, buffer_size, "%.1fC", sensor_data.temperature);
     lcd1602_write_string(buffer);
 }
@@ -161,7 +161,7 @@ static void lcd_humidity_mode(sensor_data_t sensor_data, char *buffer, uint8_t b
     lcd1602_set_cursor_pos(0, 0);
     lcd1602_write_string("Humidity:");
 
-    lcd1602_set_cursor_pos(1, 6);
+    lcd1602_set_cursor_pos(6, 1);
     snprintf(buffer, buffer_size, "%3d%%", sensor_data.humidity);
     lcd1602_write_string(buffer);
 }
@@ -181,7 +181,7 @@ static void lcd_luminosity_mode(sensor_data_t sensor_data, char *buffer, uint8_t
     lcd1602_set_cursor_pos(0, 0);
     lcd1602_write_string(buffer);
 
-    lcd1602_set_cursor_pos(1, 5); // Position the cursor for the luminosity icon
+    lcd1602_set_cursor_pos(5, 1); // Position the cursor for the luminosity icon
     draw_luminosity_icon(sensor_data.luminosity);
 }
 
@@ -193,7 +193,7 @@ static void lcd_outdated_data_mode(void) {
     lcd1602_set_cursor_pos(0, 0);
     lcd1602_write_string("OUTDATED DATA");
 
-    lcd1602_set_cursor_pos(1, 0);
+    lcd1602_set_cursor_pos(0, 1);
     lcd1602_write_string("Check sensors");
 }
 
