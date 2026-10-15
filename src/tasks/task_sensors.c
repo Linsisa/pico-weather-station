@@ -1,13 +1,12 @@
 #include "task_sensors.h"
 
-#include "stdio.h"
-#include "stdint.h"
-
-#include "../drivers/ldr_adc.h"
-#include "../drivers/dht11_pio.h"
-
 #include "config.h"
 #include "sensor_data.h"
+#include "src/drivers/ldr_adc.h"
+#include "src/drivers/dht11_pio.h"
+
+#include <stdio.h>
+#include <stdint.h>
 
 
 /*! \brief Read the LDR value from the ADC and convert it to a percentage.

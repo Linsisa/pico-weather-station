@@ -1,9 +1,11 @@
-#include <stdio.h>
+#include "lcd1602_i2c.h"
+
+#include "config.h"
+
 #include "pico/stdlib.h"
 #include "hardware/i2c.h"
 
-#include "lcd1602_i2c.h"
-#include "config.h"
+#include <stdio.h>
 
 
 /***

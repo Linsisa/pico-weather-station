@@ -1,10 +1,10 @@
 #ifndef DHT11_PIO_H
 #define DHT11_PIO_H
 
+#include "config.h"
+
 #include <stdint.h>
 #include <stdbool.h>
-
-#include "config.h"
 
 
 int dht11_pio_program_init();

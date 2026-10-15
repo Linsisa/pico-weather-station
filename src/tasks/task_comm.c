@@ -1,16 +1,17 @@
 #include "task_comm.h"
 
-#include "stdio.h"
-#include "string.h"
-#include "task.h"
+#include "config.h"
+#include "sensor_data.h"
+#include "wifi_secrets.h"   // WIFI_SSID, WIFI_PASSWORD, MQTT_BROKER_IP, MQTT_USER, MQTT_PASS
 
 #include "pico/cyw43_arch.h"
 #include "lwip/apps/mqtt.h"
 #include "lwip/ip_addr.h"
+#include "task.h"
 
-#include "config.h"
-#include "sensor_data.h"
-#include "wifi_secrets.h"   // WIFI_SSID, WIFI_PASSWORD, MQTT_BROKER_IP, MQTT_USER, MQTT_PASS
+#include <stdio.h>
+#include <string.h>
+
 
 static mqtt_client_t *mqtt_client;
 static volatile bool mqtt_connected = false;
