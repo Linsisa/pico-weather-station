@@ -18,7 +18,7 @@
  */
 static void read_ldr(sensor_data_t *sensor_data) {
     uint16_t ldr_value = ldr_adc_read();
-    sensor_data->luminosity = (uint8_t)((ldr_value * 100) / 4095);
+    sensor_data->luminosity = (uint8_t)((ldr_value * LDR_PERCENTAGE_MAX) / LDR_ADC_MAX_VALUE);
 }
 
 /*! \brief Read data from the DHT11 sensor using the PIO program.
@@ -37,7 +37,7 @@ static bool read_dht11(sensor_data_t *sensor_data, int program_offset) {
     if (dht11_read_data(program_offset, dht11_bytes)) {
         if (dht11_valid_checksum(dht11_bytes)) {
             sensor_data->humidity = dht11_bytes[0];
-            sensor_data->temperature = (float)dht11_bytes[2] + (float)dht11_bytes[3] / 10.0f;
+            sensor_data->temperature = (float)dht11_bytes[2] + ((float)dht11_bytes[3] / DHT_DECIMAL_FACTOR);
             return true;
         } else {
             printf("DHT11 checksum failed.");

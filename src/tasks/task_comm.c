@@ -15,7 +15,7 @@
 
 static mqtt_client_t *mqtt_client;
 static volatile bool mqtt_connected = false;
-static volatile bool mqtt_conection_status_received = false;
+static volatile bool mqtt_connection_status_received = false;
 static volatile err_t last_mqtt_publish_result = ERR_OK;
 
 /*! \brief MQTT connection callback function.
@@ -28,7 +28,7 @@ static volatile err_t last_mqtt_publish_result = ERR_OK;
  */
 static void mqtt_connection_callback(mqtt_client_t *client, void *arg, mqtt_connection_status_t status) {
     mqtt_connected = (status == MQTT_CONNECT_ACCEPTED);
-    mqtt_conection_status_received = true;
+    mqtt_connection_status_received = true;
     if (!mqtt_connected) {
         printf("MQTT refuse, status=%d\n", status);
     }
@@ -97,7 +97,7 @@ static bool mqtt_setup(void) {
 static bool publish_sensor_data(sensor_data_t *data) {
     if (!mqtt_connected) return false;
 
-    char payload[128];
+    char payload[MQTT_PAYLOAD_BUFFER_SIZE];
     int len = snprintf(payload, sizeof(payload),
         "{\"temp\":%.1f,\"hum\":%d,\"lum\":%d}",
         data->temperature, data->humidity, data->luminosity);
@@ -181,15 +181,15 @@ static bool wifi_init(void) {
  */
 static void blink_connection_status(bool connection_ok) {
     if (connection_ok) {
-        for (int i = 0; i < 3; i++) {
+        for (int blink = 0; blink < CONNECTION_SUCCESS_BLINK_COUNT; blink++) {
             cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, LED_ON);
-            vTaskDelay(pdMS_TO_TICKS(800));
+            vTaskDelay(pdMS_TO_TICKS(CONNECTION_LED_ON_TIME_MS));
             cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, LED_OFF);
-            vTaskDelay(pdMS_TO_TICKS(200));
+            vTaskDelay(pdMS_TO_TICKS(CONNECTION_LED_OFF_TIME_MS));
         }
     } else {
         cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, LED_ON);
-        vTaskDelay(pdMS_TO_TICKS(1500));
+        vTaskDelay(pdMS_TO_TICKS(CONNECTION_FAILURE_LED_TIME_MS));
         cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, LED_OFF);
     }
 }
@@ -200,7 +200,7 @@ static void blink_connection_status(bool connection_ok) {
  */
 static void blink_data_published(void) {
     cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, LED_ON);
-    vTaskDelay(pdMS_TO_TICKS(1500));
+    vTaskDelay(pdMS_TO_TICKS(DATA_PUBLISHED_LED_TIME_MS));
     cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, LED_OFF);
 }
 
@@ -209,9 +209,18 @@ void task_comm(void *pvParameters) {
     bool wifi_ok = wifi_init();
     
     if (wifi_ok && mqtt_setup()) {
+        // Define a timeout for the MQTT connection status callback to be called.
+        // 15000ms / 100ms = 150 iterations = 15 seconds
+        uint8_t timeout_counter = MQTT_CONNECTION_STATUS_TIMEOUT_MS / MQTT_CONNECTION_POLL_INTERVAL_MS;
+
         // Wait for the MQTT connection status callback to be called.
-        while (!mqtt_conection_status_received) {
-            vTaskDelay(pdMS_TO_TICKS(100));
+        while (!mqtt_connection_status_received && timeout_counter > 0) {
+            vTaskDelay(pdMS_TO_TICKS(MQTT_CONNECTION_POLL_INTERVAL_MS));
+            timeout_counter--;
+        }
+        if (timeout_counter == 0) {
+            printf("MQTT connection status callback not received within the timeout period.\n");
+            mqtt_connected = false;
         }
     }
     blink_connection_status(wifi_ok && mqtt_connected);

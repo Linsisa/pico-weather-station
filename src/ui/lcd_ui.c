@@ -12,7 +12,7 @@
  * It sets up the necessary configurations for the LCD to function properly.
  */
 void lcd_init(void) {
-    i2c_init(I2C_PORT, 100 * 1000); 
+    i2c_init(I2C_PORT, I2C_BAUDRATE_HZ); 
     lcd1602_init();
 }
 
@@ -32,12 +32,12 @@ void lcd_clear_ui(void) {
  * \param luminosity The luminosity percentage (0-100) to determine how many blocks to fill.
  */
 void draw_luminosity_icon(uint8_t luminosity) {
-    uint8_t block_range = 4; // Default to 4 blocks for luminosity up to 100%.
+    uint8_t block_range = LUMINOSITY_BAR_BLOCKS; // Default to 4 blocks for luminosity up to 100%.
     uint8_t block_count = 0;
 
     // Determine the number of blocks to display based on luminosity percentage.
     for (uint8_t i = 0; i < block_range; i++) {
-        if (luminosity > (i * 25)) { block_count++; }
+        if (luminosity > (i * LUMINOSITY_BAR_STEP_PERCENT)) { block_count++; }
     }
 
     lcd1602_write_char(LEFT_ROUND_BRACKET_CHAR);

@@ -73,7 +73,7 @@ static void refresh_display(sensor_data_t sensor_data, bool data_ok, char *buffe
 void task_display(void *pvParameters) {
 
     sensor_data_t sensor_data = {0}; // Initialize sensor data structure to hold the latest sensor readings.
-    static char buffer[16]; // Buffer to hold formatted strings for LCD display.
+    static char buffer[LCD_ROW_BUFFER_SIZE]; // Buffer to hold formatted strings for a single row of LCD display.
     uint8_t buffer_size = sizeof(buffer);
     uint32_t notification_value; // Variable used to store the RTOS task's notification value, when the task is notified.
     bool data_retrieved_ok = false; // Flag to indicate if new sensor data has been retrieved from the queue and is fresh.

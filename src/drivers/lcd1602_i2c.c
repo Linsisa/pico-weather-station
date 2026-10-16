@@ -7,6 +7,24 @@
 
 #include <stdio.h>
 
+#define LCD_ENABLE_PULSE_DELAY_US 1
+#define LCD_COMMAND_DELAY_US 50
+#define LCD_POWER_ON_DELAY_MS 100
+#define LCD_INIT_DELAY_MS 5
+#define LCD_MODE_SWITCH_DELAY_US 150
+#define LCD_CLEAR_DELAY_MS 3
+
+#define LCD_CMD_INIT_8BIT       0x30
+#define LCD_CMD_SWITCH_4BIT     0x20
+#define LCD_CMD_FUNCTION_4BIT   0x28
+#define LCD_CMD_DISPLAY_OFF     0x08
+#define LCD_CMD_DISPLAY_ON      0x0C
+#define LCD_CMD_ENTRY_MODE      0x06
+#define LCD_CMD_CLEAR_DISPLAY   0x01
+
+#define LCD_ROW_0_ADDRESS 0x80
+#define LCD_ROW_1_ADDRESS 0xC0
+
 
 /***
  * LCD 1602 I2C Driver
@@ -26,7 +44,7 @@ static void pcf_write(uint8_t value) {
         I2C_PORT,
         LCD_ADDR,
         &value,
-        1,
+        PCF8574_WRITE_LENGTH,
         false
     );
 
@@ -54,11 +72,11 @@ static void lcd_pulse_enable(uint8_t value) {
 
     // Set E HIGH and keep the data stable.
     pcf_write(value | E);
-    sleep_us(1);
+    sleep_us(LCD_ENABLE_PULSE_DELAY_US);
 
     // Set E LOW to complete the write operation.
     pcf_write(value & ~E);
-    sleep_us(1);
+    sleep_us(LCD_ENABLE_PULSE_DELAY_US);
 }
 
 
@@ -76,7 +94,7 @@ static void lcd_send_byte_8bits_mode(uint8_t byte, uint8_t rs) {
      * The datasheet specifies a minimum execution time of 39us for most commands, 
      * so we wait for 50us to ensure the command has been processed before sending any further commands or data.
      */
-    sleep_us(50);
+    sleep_us(LCD_COMMAND_DELAY_US);
 }
 
 /*!
@@ -103,7 +121,7 @@ static void lcd_send_byte_4bits_mode(uint8_t byte, uint8_t rs) {
      * The datasheet specifies a minimum execution time of 39us for most commands, 
      * so we wait for 50us to ensure the command has been processed before sending any further commands or data.
      */
-    sleep_us(50);
+    sleep_us(LCD_COMMAND_DELAY_US);
 }
 
 
@@ -122,46 +140,46 @@ void lcd1602_init(void) {
 
     // Initialisation instruction applied to the LCD from the datasheet.
     // Required delay after power-on before sending commands to the LCD.
-    sleep_ms(100);
+    sleep_ms(LCD_POWER_ON_DELAY_MS);
 
     // First set of commands to initialize the LCD in 8-bit mode.
-    lcd_send_byte_8bits_mode(0x30, 0);
-    sleep_ms(5);
-    lcd_send_byte_8bits_mode(0x30, 0);
-    sleep_us(150);
-    lcd_send_byte_8bits_mode(0x30, 0);
+    lcd_send_byte_8bits_mode(LCD_CMD_INIT_8BIT, 0);
+    sleep_ms(LCD_INIT_DELAY_MS);
+    lcd_send_byte_8bits_mode(LCD_CMD_INIT_8BIT, 0);
+    sleep_us(LCD_MODE_SWITCH_DELAY_US);
+    lcd_send_byte_8bits_mode(LCD_CMD_INIT_8BIT, 0);
 
-    // Now switch screen to 4-bit mode with th next command.
-    lcd_send_byte_8bits_mode(0x20, 0);
+    // Now switch screen to 4-bit mode with the next command.
+    lcd_send_byte_8bits_mode(LCD_CMD_SWITCH_4BIT, 0);
 
     // Function set: 4-bit mode, 2 lines, 5x8 dots.
-    lcd_send_byte_4bits_mode(0x28, 0);
+    lcd_send_byte_4bits_mode(LCD_CMD_FUNCTION_4BIT, 0);
 
     // Display OFF.
-    lcd_send_byte_4bits_mode(0x08, 0);
+    lcd_send_byte_4bits_mode(LCD_CMD_DISPLAY_OFF, 0);
 
     // Display clear.
     lcd1602_clear();
 
     // Entry mode set: Increment cursor, no display shift.
-    lcd_send_byte_4bits_mode(0x06, 0);
+    lcd_send_byte_4bits_mode(LCD_CMD_ENTRY_MODE, 0);
 
     // Display ON, Cursor OFF, Blink OFF
-    lcd_send_byte_4bits_mode(0x0C, 0);
+    lcd_send_byte_4bits_mode(LCD_CMD_DISPLAY_ON, 0);
 }
 
 /*!
  * \brief Send a clear command to the LCD1602 display.
  */
 void lcd1602_clear(void) {
-    lcd_send_byte_4bits_mode(0x01, 0); // Send clear command to display.
+    lcd_send_byte_4bits_mode(LCD_CMD_CLEAR_DISPLAY, 0); // Send clear command to display.
     
     /*
      * Wait for the clear command to complete. 
      * According to the datasheet, this command takes around 1.53ms to execute.
      * So we wait for 3ms to ensure the command has completed before sending any further commands or data.
      */
-    sleep_ms(3);
+    sleep_ms(LCD_CLEAR_DELAY_MS);
 }
 
 /*!
@@ -174,12 +192,12 @@ void lcd1602_set_cursor_pos(uint8_t column, uint8_t row) {
     /*
      * The function calculates the appropriate DDRAM address based on the row and column values, 
      * and then sends the command to set the cursor position.
-     * Default adress to send is 10000000 for row 0 and 11000000 for row 1.
+     * Default address to send is 10000000 for row 0 and 11000000 for row 1.
     */
 
-    uint8_t base_address = 0x80; // Base address for row 0
+    uint8_t base_address = LCD_ROW_0_ADDRESS; // Base address for row 0
 
-    if (row == 1) { base_address = 0xC0; }
+    if (row == 1) { base_address = LCD_ROW_1_ADDRESS; }
 
     base_address += column; // Add the column to the base address.
     lcd_send_byte_4bits_mode(base_address, 0);
