@@ -126,11 +126,11 @@ task skips MQTT publication for outdated data. Luminosity is only updated togeth
 ### 1. Prerequisites & Configuration
 Tested with Pico SDK 2.3.1, the ARM GCC toolchain, CMake and Ninja.
 
-FreeRTOS-Kernel (V11.1.0) is expected in `lib/FreeRTOS-Kernel`:
 ```bash
-git clone --branch V11.1.0 https://github.com/FreeRTOS/FreeRTOS-Kernel.git lib/FreeRTOS-Kernel
-git -C lib/FreeRTOS-Kernel submodule update --init --recursive
+git clone --recurse-submodules https://github.com/Linsisa/pico-weather-station.git
 ```
+FreeRTOS-Kernel (V11.1.0) is expected in `lib/FreeRTOS-Kernel`.
+
 
 Create `include/wifi_secrets.h` locally with your credentials and MQTT broker information, see example in `include/wifi_secrets.h.example`.
 
@@ -164,3 +164,8 @@ ninja -C build
 - **DHT11 limitations:** low accuracy and a slow sampling rate. If it stops responding, the measurement is skipped and retried 4 s later.
 - **No data logging:** the firmware only displays and publishes the latest readings.
 - **Reduced screen brightness:** The LCD is powered directly from the Pico W's 3.3V pin, which may result in lower brightness compared to a dedicated 5V supply.
+
+
+## License
+
+This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
