@@ -97,6 +97,6 @@ void task_display(void *pvParameters) {
             current_display_mode = (display_mode_t)((current_display_mode + 1) % DISPLAY_MODE_COUNT);
         }
 
-        refresh_display(sensor_data, data_retrieved_ok, buffer, buffer_size);        
+        refresh_display(sensor_data, data_retrieved_ok, buffer, buffer_size);
     }
 }
