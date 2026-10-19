@@ -16,6 +16,28 @@
 QueueHandle_t sensor_data_queue = NULL; // Queue for sensor data used by the display and communication tasks.
 TaskHandle_t display_task_handle = NULL; // Handle for the display task.
 
+/*! \brief This function is called when a stack overflow is detected in a FreeRTOS task.
+ *
+ * This function logs the stack overflow event and the name of the task that caused it.
+ * It then enters an infinite loop, making the onboard LED blink rapidly to indicate a system crash.
+ */
+void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName) {
+    // 1. Log the stack overflow event and the name of the task that caused it.
+    printf("\n!!! CRITICAL STACK OVERFLOW DETECTED !!!\n");
+    printf("The task that crashed the system is: [%s]\n", pcTaskName);
+
+    // 2. Enter an infinite loop to indicate a system crash.
+    const uint LED_PIN = CYW43_WL_GPIO_LED_PIN;
+    gpio_init(LED_PIN);
+    gpio_set_dir(LED_PIN, GPIO_OUT);
+
+    while (true) {
+        gpio_put(LED_PIN, LED_ON);
+        sleep_ms(TASK_OVERFLOW_LED_BLINK_TIME_MS);
+        gpio_put(LED_PIN, LED_OFF);
+        sleep_ms(TASK_OVERFLOW_LED_BLINK_TIME_MS);
+    }
+}
 
 int main() {
     stdio_init_all();
