@@ -36,7 +36,7 @@ This project collects environmental measurements with a Raspberry Pi Pico W, dis
 | --- | --- | --- |
 | LCD SDA | PIN 6 / GPIO4 | I2C0 |
 | LCD SCL | PIN 7 / GPIO5 | I2C0 |
-| Display button | PIN 19 / GPIO14 | Button between GPIO14 and 3V3; <br/>internal pull-down enabled in firmware (rising-edge interrupt)” |
+| Display button | PIN 19 / GPIO14 | Button between GPIO14 and 3V3; <br/>internal pull-down enabled in firmware (rising-edge interrupt) |
 | DHT11 data | PIN 20 / GPIO15 | DHT11 single-wire data line |
 | LDR analog output | PIN 31 / GPIO26 | ADC0, LDR voltage-divider output |
 
