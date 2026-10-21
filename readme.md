@@ -78,7 +78,7 @@ Solid arrows carry data through the queue. Dashed arrows are task notifications 
 | --- | --- | --- |
 | `task_sensors` | Reads the LDR and DHT11. If the DHT11 checksum is valid, timestamps the measurement and overwrites the queue, then notifies the display task. | 4 s / priority 2 |
 | `task_display` | Wakes on a sensor or button notification, or after a timeout. Reads the queue without consuming it and refreshes the LCD, or shows `OUTDATED DATA` when the measurement is outdated. | Event-driven, 6 s timeout / priority 3 |
-| `task_comm` | Connects to Wi-Fi and MQTT, then publishes the latest measurement if it is not outdated. | 10 s / priority 1 |
+| `task_comm` | Connects to Wi-Fi and MQTT, Reads the queue without consuming it and then publishes the latest measurement if it is not outdated. | 10 s / priority 1 |
 
 ### Display Modes
 
@@ -109,9 +109,9 @@ MQTT parameters are defined in `include/config.h`.
 DHT11 frames are accepted only when their checksum is valid. Each accepted
 measurement receives a timestamp in milliseconds since boot.
 
-A measurement is considered fresh for 12 seconds `SENSOR_DATA_MAX_AGE_MS`. The display shows
+A measurement is considered fresh for 12 seconds (defined by `SENSOR_DATA_MAX_AGE_MS`). The display shows
 `OUTDATED DATA` when no fresh measurement is available, and the communication
-task skips MQTT publication for outdated data. Luminosity is only updated together with a valid DHT11 frame, so a DHT11 failure also makes the luminosity reading outdated.
+task skips MQTT publication of outdated data. Luminosity is only updated together with a valid DHT11 frame, so a DHT11 failure also makes the luminosity reading outdated.
 
 ### Status LED
 
